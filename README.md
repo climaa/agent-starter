@@ -115,3 +115,7 @@ If `N8N_WEBHOOK_TOKEN` is set (shell or `.env`), compose passes the same value t
 - Python 3.12, uv, `src/` layout. `make lint` runs ruff and `mypy --strict` on `src`. `make test` runs pytest with pytest-asyncio and respx (HTTP mocked).
 - Never commit secrets: only `.env.example` is tracked.
 - Sample data in `data/` is a fictional company ("Northwind Logistics"). The corpus is tiny, so hit@k is an easy bar here. Re-baseline it on the real brief's data.
+
+## License
+
+MIT. See [LICENSE](LICENSE). The sample data in `data/` and the n8n workflow in `n8n/` were written for this repo and are covered by the same license.
