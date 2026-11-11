@@ -1,4 +1,4 @@
-"""Every prompt in one file — the first thing to edit when adapting to a new brief."""
+"""Every prompt in one file — the first thing to edit when adapting to a new domain."""
 
 DOMAIN = "an internal knowledge-base assistant for Northwind Logistics (fictional demo data)"
 
