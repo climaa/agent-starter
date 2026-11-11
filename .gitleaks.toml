@@ -1,0 +1,13 @@
+# Secret scanning config. CI runs gitleaks over the full git history (see .github/workflows/ci.yml).
+# Local: gitleaks git --log-opts=--all --redact -v .
+title = "agent-starter gitleaks config"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Fake AWS key id used by guardrail tests to prove secrets are redacted (not a real credential)"
+condition = "AND"
+regexTarget = "secret"
+regexes = ['''^AKIAABCDEFGHIJKLMNOP$''']
+paths = ['''^tests/''']
