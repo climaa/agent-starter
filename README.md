@@ -8,6 +8,7 @@ make demo OFFLINE=1        # end-to-end without credentials
 make lint test             # ruff + mypy --strict + pytest (offline)
 make eval OFFLINE=1        # hit-rate / faithfulness table
 make dev                   # API on :8000 (uses .env → Bedrock by default)
+make smoke                 # docker compose API + n8n end to end, offline (see below)
 ```
 
 ## Architecture (60 seconds)
@@ -69,9 +70,20 @@ curl -N localhost:8000/chat -H 'content-type: application/json' \
 curl localhost:8000/webhook/n8n -H 'content-type: application/json' -d '{"message":"open a ticket, parcel damaged"}'
 ```
 
-**n8n.** Run `docker compose up --build`, then import the workflow with `docker compose exec n8n n8n import:workflow --input=/workflows/agent-workflow.json`. It sets up two flows:
+**n8n.** Run `docker compose up --build` (add `-f docker-compose.yml -f docker-compose.offline.yml` to use the fake LLM and local embeddings without credentials). Then import and publish the workflow; n8n only registers webhooks for published workflows:
+
+```bash
+docker compose exec n8n n8n import:workflow --input=/workflows/agent-workflow.json
+docker compose exec n8n n8n publish:workflow --id=agentStarterAsk1   # n8n >= 2.x
+```
+
+It sets up two flows:
 - `POST :5678/webhook/ask` → calls the agent's `/webhook/n8n` → returns the answer.
 - `POST :5678/webhook/ticket` receives the agent's `create_ticket` tool calls and returns a ticket id. Replace this with Jira, Slack or email nodes.
+
+If `N8N_WEBHOOK_TOKEN` is set (shell or `.env`), compose passes the same value to both containers: n8n sends it as `X-Webhook-Token` and the API requires it.
+
+**Smoke test.** `make smoke` (or `scripts/smoke.sh`) does all of the above with no credentials: it brings up API + n8n with `docker-compose.offline.yml` (n8n pinned to `N8N_VERSION=2.47.4` by default), imports and publishes the workflow, then checks that (1) `POST :5678/webhook/ask` reaches the API's `/webhook/n8n` and returns 200 with a cited answer, (2) a "open a ticket" request makes the agent call `create_ticket`, which reaches n8n's `/webhook/ticket` and gets back an `N8N-…` id, and (3) the API rejects `/webhook/n8n` without the token. It uses host ports 8000 and 5678, tears everything down (volumes included) on exit, and leaves the stack running with `KEEP_UP=1`. CI runs it as the `smoke` job.
 
 ## 20-minute demo script
 

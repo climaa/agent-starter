@@ -1,0 +1,12 @@
+# Offline overlay: fake LLM + local hashing embeddings. No cloud credentials, no model calls.
+#   docker compose -f docker-compose.yml -f docker-compose.offline.yml up --build
+# Used by scripts/smoke.sh. `environment` wins over values from .env (env_file).
+services:
+  api:
+    environment:
+      LLM_PROVIDER: fake
+      EMBEDDINGS_PROVIDER: local
+  n8n:
+    environment:
+      N8N_DIAGNOSTICS_ENABLED: "false"          # no telemetry calls home
+      N8N_VERSION_NOTIFICATIONS_ENABLED: "false"
