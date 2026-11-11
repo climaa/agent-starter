@@ -3,6 +3,13 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -16,6 +23,15 @@ jobs:
         with:
           version: "0.13.7"
       - run: uv sync --frozen
-      - run: make lint
-      - run: make test
+      - run: make lint # ruff check + ruff format --check + mypy --strict
+      - run: make test # pytest (offline fakes)
       - run: make eval
+
+  smoke:
+    # docker compose (API + n8n) end to end with the offline fake LLM/embeddings. No secrets.
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - run: scripts/smoke.sh

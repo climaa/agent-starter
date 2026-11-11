@@ -5,7 +5,7 @@ export LLM_PROVIDER := fake
 export EMBEDDINGS_PROVIDER := local
 endif
 
-.PHONY: setup dev test lint fmt ingest demo eval docker-up docker-down
+.PHONY: setup dev test lint fmt ingest demo eval docker-up docker-down smoke
 
 setup:            ## install deps (incl. dev) and create .env if missing
 	uv sync --all-extras
@@ -40,3 +40,6 @@ docker-up:
 
 docker-down:
 	docker compose down
+
+smoke:            ## docker compose API + n8n end-to-end smoke (offline fakes, no credentials)
+	scripts/smoke.sh

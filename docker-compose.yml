@@ -7,6 +7,7 @@ services:
         required: false
     environment:
       TICKET_WEBHOOK_URL: http://n8n:5678/webhook/ticket
+      N8N_WEBHOOK_TOKEN: ${N8N_WEBHOOK_TOKEN:-}   # same value n8n sends as X-Webhook-Token
       # Mount ~/.aws read-only to use your local profile with Bedrock:
       # AWS_PROFILE: default
     # volumes: ["~/.aws:/home/app/.aws:ro"]
@@ -20,7 +21,7 @@ services:
       GENERIC_TIMEZONE: Europe/Madrid
     volumes:
       - n8n_data:/home/node/.n8n
-      - ./n8n:/workflows:ro   # import: docker compose exec n8n n8n import:workflow --input=/workflows/agent-workflow.json
+      - ./n8n:/workflows:ro   # import + publish: see README "n8n" (scripts/smoke.sh does both)
 
 volumes:
   n8n_data:
