@@ -1,0 +1,71 @@
+[project]
+name = "agent-starter"
+version = "0.1.0"
+description = "Reusable LangGraph agent starter: plan → retrieve → act → answer, with guardrails, RAG, tools, FastAPI and evals."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "langgraph>=1.2",
+    "langchain-core>=1.7",
+    "langchain-text-splitters>=1.1",
+    "langchain-aws>=1.9",
+    "langchain-anthropic>=1.7",
+    "langchain-openai>=1.7",
+    "faiss-cpu>=1.9",
+    "numpy>=1.26",
+    "pypdf>=5.0",
+    "pydantic>=2.8",
+    "pydantic-settings>=2.4",
+    "httpx>=0.27",
+    "fastapi>=0.162",
+    "uvicorn[standard]>=0.30",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+observability = ["langfuse>=3.0"]
+
+[project.scripts]
+agent-ingest = "agent_starter.rag.ingest:main"
+agent-demo = "agent_starter.cli:main"
+agent-eval = "agent_starter.evals.run:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.6",
+    "mypy>=1.11",
+    "types-pyyaml>=6.0",
+    "respx>=0.21",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agent_starter"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "ASYNC", "RUF"]
+ignore = ["RUF001"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["src"]
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["langfuse.*", "faiss.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]

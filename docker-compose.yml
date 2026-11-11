@@ -1,0 +1,26 @@
+services:
+  api:
+    build: .
+    ports: ["8000:8000"]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      TICKET_WEBHOOK_URL: http://n8n:5678/webhook/ticket
+      # Mount ~/.aws read-only to use your local profile with Bedrock:
+      # AWS_PROFILE: default
+    # volumes: ["~/.aws:/home/app/.aws:ro"]
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:${N8N_VERSION:-latest}  # pin a version for real use
+    ports: ["5678:5678"]
+    environment:
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"   # workflow reads N8N_WEBHOOK_TOKEN
+      N8N_WEBHOOK_TOKEN: ${N8N_WEBHOOK_TOKEN:-}
+      GENERIC_TIMEZONE: Europe/Madrid
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./n8n:/workflows:ro   # import: docker compose exec n8n n8n import:workflow --input=/workflows/agent-workflow.json
+
+volumes:
+  n8n_data:

@@ -1,0 +1,83 @@
+{
+  "name": "agent-starter: ask agent + ticket sink",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ask",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "0b6f2a1e-0001-4a51-9c11-000000000001",
+      "name": "Webhook: ask",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "0b6f2a1e-0001-4a51-9c11-0000000000a1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:8000/webhook/n8n",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Webhook-Token", "value": "={{ $env.N8N_WEBHOOK_TOKEN }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ message: $json.body.message, thread_id: $json.body.thread_id }) }}",
+        "options": { "timeout": 60000 }
+      },
+      "id": "0b6f2a1e-0002-4a51-9c11-000000000002",
+      "name": "Call agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [240, 0]
+    },
+    {
+      "parameters": { "respondWith": "firstIncomingItem", "options": {} },
+      "id": "0b6f2a1e-0003-4a51-9c11-000000000003",
+      "name": "Respond with answer",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [480, 0]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ticket",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "0b6f2a1e-0004-4a51-9c11-000000000004",
+      "name": "Webhook: ticket (from create_ticket tool)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 240],
+      "webhookId": "0b6f2a1e-0004-4a51-9c11-0000000000a4"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ticket_id: 'N8N-' + $now.toMillis(), received: $json.body }) }}",
+        "options": {}
+      },
+      "id": "0b6f2a1e-0005-4a51-9c11-000000000005",
+      "name": "Respond ticket id (replace with Jira/Slack/email)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [240, 240]
+    }
+  ],
+  "connections": {
+    "Webhook: ask": { "main": [[{ "node": "Call agent", "type": "main", "index": 0 }]] },
+    "Call agent": { "main": [[{ "node": "Respond with answer", "type": "main", "index": 0 }]] },
+    "Webhook: ticket (from create_ticket tool)": {
+      "main": [[{ "node": "Respond ticket id (replace with Jira/Slack/email)", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "active": false
+}

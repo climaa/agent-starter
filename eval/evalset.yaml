@@ -1,0 +1,22 @@
+# Tiny eval set. expected_source = file in ./data that must be retrieved (hit-rate).
+# must_include = keywords the answer must contain (case-insensitive).
+- id: refund-window
+  question: How many days do customers have to request a refund?
+  expected_source: refunds.md
+  must_include: ["30 days"]
+- id: express-sla
+  question: When are express shipments delivered?
+  expected_source: shipping.md
+  must_include: ["next business day"]
+- id: damaged-report
+  question: How long does a customer have to report a damaged parcel?
+  expected_source: damaged-goods.md
+  must_include: ["48 hours"]
+- id: saturday-support
+  question: What are the support hours on Saturdays?
+  expected_source: support-hours.txt
+  must_include: ["09:00"]
+- id: lost-parcel
+  question: When is a parcel considered lost?
+  expected_source: damaged-goods.md
+  must_include: ["10 business days"]
