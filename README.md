@@ -1,17 +1,49 @@
 # agent-starter
 
-A small, readable LangGraph agent template: **guardrails → plan → retrieve (RAG) → act (tools) → answer**, served over FastAPI (SSE + n8n webhook), with evals, Docker and CI. It runs **fully offline** with a fake LLM and local embeddings, and switches to **AWS Bedrock** (Claude + Titan v2) through `.env`.
+[![CI](https://github.com/climaa/agent-starter/actions/workflows/ci.yml/badge.svg)](https://github.com/climaa/agent-starter/actions/workflows/ci.yml)
+![Python 3.12](https://img.shields.io/badge/python-3.12-blue)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
+A reusable Python starter for tool-using RAG agents — **guardrails → plan → retrieve → act → answer** in LangGraph, served over FastAPI (SSE + n8n webhook), with evals, Docker and CI — so you can start from a tested skeleton instead of a blank file.
+
+It runs **fully offline** (deterministic fake LLM + local hashing embeddings) and switches to AWS Bedrock, Anthropic or OpenAI through `.env`.
+
+## Quickstart (60 seconds, no cloud keys)
+
+Needs [uv](https://docs.astral.sh/uv/) and Python 3.12.
 
 ```bash
+git clone https://github.com/climaa/agent-starter && cd agent-starter
 make setup                 # uv sync + .env from .env.example
-make demo OFFLINE=1        # end-to-end without credentials
+make demo OFFLINE=1        # RAG answer with citation, tool call, blocked prompt injection
+```
+
+With Docker, `make smoke` brings up the API + n8n with `docker-compose.offline.yml`, runs three end-to-end checks and tears everything down. Expected output (trimmed):
+
+```text
+[smoke] starting api + n8n (n8n 2.47.4, offline providers)
+[smoke] ready: api /health agent_ready
+[smoke] ready: n8n /healthz/readiness
+[smoke] importing + publishing n8n workflow
+[smoke] ready: n8n webhooks registered
+[smoke] 1/3 RAG answer via n8n /webhook/ask
+[smoke] HTTP 200 {"thread_id":"smoke","answer":"Customers can request a refund within 30 days of delivery. [S1]","sources":[...],"guardrail_notes":[]}
+[smoke] 2/3 tool call: agent create_ticket -> n8n /webhook/ticket
+[smoke] HTTP 200 {"thread_id":"...","answer":"If a parcel arrives damaged, ... [S1] Action taken: create_ticket -> {\"status\": \"created\", ... \"ticket_id\":\"N8N-1794410541254\...
+[smoke] 3/3 api /webhook/n8n rejects a missing token (so 1/3 proves n8n sent it)
+[smoke] HTTP 401 as expected
+[smoke] PASS
+```
+
+Other targets:
+
+```bash
 make lint test             # ruff + mypy --strict + pytest (offline)
 make eval OFFLINE=1        # hit-rate / faithfulness table
 make dev                   # API on :8000 (uses .env → Bedrock by default)
-make smoke                 # docker compose API + n8n end to end, offline (see below)
 ```
 
-## Architecture (60 seconds)
+## Architecture
 
 ```mermaid
 flowchart LR
@@ -46,19 +78,30 @@ flowchart LR
 | `observability.py` | JSON logs with `request_id`/`thread_id`. Langfuse callback turns on only when keys are set. |
 | `evals/run.py` + `eval/evalset.yaml` | hit@k, lexical faithfulness, keyword correctness. |
 
-**Providers.** Set `LLM_PROVIDER` to `bedrock` (default, `ChatBedrockConverse`, Claude), `anthropic`, `openai` or `fake`. Set `EMBEDDINGS_PROVIDER` to `bedrock` (Titan v2), `openai` or `local`. The `fake` and `local` options are deterministic and offline: the fake LLM copies the best-matching sentence and cites it. Tests and CI use only these. After switching embeddings providers, re-run `make ingest`.
+## Providers
 
-## Adapting to a new brief in 15 minutes
+Pick providers with environment variables (see `.env.example`; never commit `.env`).
 
-1. **(2 min) Data.** Replace `data/*` with the brief's documents and run `make ingest OFFLINE=1` to check that chunking works.
-2. **(3 min) Prompts.** Edit `prompts.py`: set `DOMAIN`, plus the tone and refusal rules in `ANSWER_SYSTEM`.
-3. **(4 min) Tools.** Copy `tools/ticket.py` to `tools/<action>.py`. Change the args model, the function body and the description. Delete any example tools you don't need.
-4. **(2 min) Guardrails.** Add domain rules to `guardrails.py` (denied topics, PII regexes, length).
-5. **(2 min) Eval.** Rewrite the 5 cases in `eval/evalset.yaml` for the brief, then run `make eval OFFLINE=1`.
-6. **(2 min) Real model.** Set `.env` to `LLM_PROVIDER=bedrock`, plus `AWS_PROFILE` and `AWS_REGION`. Run `make demo`, then `make dev`.
-7. Only if needed: change the graph shape in `build.py`, for example a human-approval node before risky tools or a router node.
+| Role | `LLM_PROVIDER` / `EMBEDDINGS_PROVIDER` | Credentials / settings |
+|---|---|---|
+| **Default** | `bedrock` — Claude via `ChatBedrockConverse`; Titan v2 embeddings | `AWS_REGION`, plus the standard AWS chain (`AWS_PROFILE`, SSO or instance role) |
+| Fallback | `anthropic` (LLM only) | `ANTHROPIC_API_KEY` |
+| Fallback | `openai` (LLM and embeddings) | `OPENAI_API_KEY` |
+| Offline / tests | `fake` (LLM), `local` (embeddings) | none — deterministic, no network |
 
-Keep `make test` green as you go. The e2e tests in `tests/test_graph_e2e.py` mirror the demo flows.
+`LLM_MODEL` and `EMBEDDINGS_MODEL` override the per-provider defaults in `providers.py`. The fake LLM copies the best-matching sentence and cites it; tests and CI use only the offline pair. After switching embeddings providers, re-run `make ingest`.
+
+## Adapting it to your domain
+
+1. **Data.** Replace `data/*` with your documents and run `make ingest OFFLINE=1` to check chunking.
+2. **Prompts.** Edit `prompts.py`: set `DOMAIN`, plus the tone and refusal rules in `ANSWER_SYSTEM`.
+3. **Tools.** Copy `tools/ticket.py` to `tools/<action>.py`; change the args model, function body and description. Delete example tools you don't need.
+4. **Guardrails.** Add domain rules to `guardrails.py` (denied topics, PII regexes, length).
+5. **Eval.** Rewrite the cases in `eval/evalset.yaml` and run `make eval OFFLINE=1`.
+6. **Real model.** Set `LLM_PROVIDER` and credentials in `.env` (see [Providers](#providers)), then `make demo` and `make dev`.
+7. Only if needed: change the graph shape in `build.py`, e.g. a human-approval node before risky tools or a router node.
+
+Keep `make test` green as you go; the e2e tests in `tests/test_graph_e2e.py` mirror the demo flows.
 
 ## API
 
@@ -83,25 +126,17 @@ It sets up two flows:
 
 If `N8N_WEBHOOK_TOKEN` is set (shell or `.env`), compose passes the same value to both containers: n8n sends it as `X-Webhook-Token` and the API requires it.
 
-**Smoke test.** `make smoke` (or `scripts/smoke.sh`) does all of the above with no credentials: it brings up API + n8n with `docker-compose.offline.yml` (n8n pinned to `N8N_VERSION=2.47.4` by default), imports and publishes the workflow, then checks that (1) `POST :5678/webhook/ask` reaches the API's `/webhook/n8n` and returns 200 with a cited answer, (2) a "open a ticket" request makes the agent call `create_ticket`, which reaches n8n's `/webhook/ticket` and gets back an `N8N-…` id, and (3) the API rejects `/webhook/n8n` without the token. It uses host ports 8000 and 5678, tears everything down (volumes included) on exit, and leaves the stack running with `KEEP_UP=1`. CI runs it as the `smoke` job.
+**Smoke test details.** `scripts/smoke.sh` pins n8n to `N8N_VERSION=2.47.4` by default, uses host ports 8000 and 5678, removes volumes on exit, and leaves the stack running with `KEEP_UP=1`. CI runs it as the `smoke` job.
 
-## 20-minute demo script
+## Design trade-offs
 
-| Min | Section | What to show |
-|---|---|---|
-| 0–3 | **Problem** | Restate the brief: who the user is, what the job is, and what counts as "done". Name the risks: hallucination, unsafe actions, cost. |
-| 3–7 | **Architecture** | The Mermaid diagram and `build.py`. Typed state; explicit nodes over a prebuilt ReAct agent; guardrails as nodes; max-steps stop; checkpointer memory per `thread_id`. |
-| 7–13 | **Live run** | `make demo`: (1) a RAG answer with a citation, (2) the ticket path calling a tool through n8n, (3) a prompt injection that gets blocked, (4) a follow-up in the same thread that uses memory. Then `curl -N /chat` to show SSE events. Optionally show the trace in Langfuse. |
-| 13–16 | **Quality** | `make eval` table, `make test` (all offline), CI. Explain what the faithfulness metric does and does not measure. |
-| 16–20 | **Trade-offs & production on AWS** | See below. |
-
-**Trade-offs taken for the prototype**
 - Lexical faithfulness metric instead of an LLM-as-judge: deterministic, free and offline, but blind to paraphrase. Production would add an LLM judge (or RAGAS) on a larger golden set.
 - In-process FAISS and `InMemorySaver`: no infrastructure, but single-instance, and memory is lost on restart.
-- A separate `plan` LLM call adds latency. On simple briefs, merge it into `act`.
+- A separate `plan` LLM call adds latency. For simple use cases, merge it into `act`.
 - Regex guardrails are cheap but easy to bypass. They are a first layer, not the whole defence.
 
-**What I'd do for production on AWS**
+## Taking it to production (AWS)
+
 - **Compute.** Run the API on ECS Fargate (SSE and long requests) behind an ALB. Use Lambda for the n8n or async event paths. Build ingest as a separate Step Functions or Lambda job triggered by S3 uploads.
 - **Models.** Bedrock with cross-region inference profiles, Bedrock Guardrails (PII, denied topics, contextual grounding check) on input and output, and model fallback in the provider factory.
 - **Data.** OpenSearch Serverless, pgvector on Aurora, or Bedrock Knowledge Bases instead of FAISS. A DynamoDB or Postgres LangGraph checkpointer instead of the in-memory one.
@@ -113,8 +148,8 @@ If `N8N_WEBHOOK_TOKEN` is set (shell or `.env`), compose passes the same value t
 ## Development
 
 - Python 3.12, uv, `src/` layout. `make lint` runs ruff and `mypy --strict` on `src`. `make test` runs pytest with pytest-asyncio and respx (HTTP mocked).
-- Never commit secrets: only `.env.example` is tracked.
-- Sample data in `data/` is a fictional company ("Northwind Logistics"). The corpus is tiny, so hit@k is an easy bar here. Re-baseline it on the real brief's data.
+- Never commit secrets: only `.env.example` is tracked. CI's `secrets` job runs gitleaks over the full git history (config in `.gitleaks.toml`).
+- Sample data in `data/` is a fictional company ("Northwind Logistics"). The corpus is tiny, so hit@k is an easy bar here. Re-baseline it on your own data.
 
 ## License
 
